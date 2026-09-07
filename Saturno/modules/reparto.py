@@ -24,7 +24,7 @@ VERDE = "#25A873"
 
 ANCHO_PENDIENTES = 330
 ANCHO_COLUMNA = 250
-CABECERA = 74
+CABECERA = 96
 TARJETA = 58
 FILA_RESERVA = 22
 HUECO = 6
@@ -324,11 +324,11 @@ class VistaReparto:
                                               for b in columna["bloques"]),
                           fill=T("text_secondary"),
                           font=("Segoe UI", 10, "bold"), tags=et)
-            c.create_text(x1 + 12, 42, anchor="w",
-                          text="devuelve aqui lo que quieras replantear"
-                          if es_destino else columna["subtitulo"],
-                          fill=VERDE if es_destino else T("text_dim"),
+            c.create_text(x1 + 12, 40, anchor="w",
+                          text=columna["subtitulo"], fill=T("text_dim"),
                           font=("Segoe UI", 8), tags=et)
+            if es_destino:
+                self._boton_mandar(c, x1, x2, "DEVOLVER AQUI", VERDE, et)
         else:
             c.create_text(x2 - 12, 18, anchor="e",
                           text="%d/%d" % (columna["ocup"], columna["plazas"]),
@@ -352,11 +352,22 @@ class VistaReparto:
                 texto = ("caben los %d" % pax_sel) if cabe else \
                     ("faltan %d plazas" % (pax_sel - libres))
                 color = VERDE if cabe else ROJO
-            c.create_text(x1 + 12, 56, anchor="w", text=texto, fill=color,
+            c.create_text(x1 + 12, 52, anchor="w", text=texto, fill=color,
                           font=("Segoe UI", 9,
                                 "bold" if es_destino else "normal"), tags=et)
+            if es_destino:
+                self._boton_mandar(c, x1, x2, "MANDAR AQUI",
+                                   VERDE if cabe else ROJO, et)
 
         self._cabeceras.append((x1, 0, x2, CABECERA, indice))
+
+    def _boton_mandar(self, c, x1, x2, texto, color, et):
+        """Que la cabecera es pinchable, dicho con todas las letras: antes
+        habia que adivinarlo."""
+        c.create_rectangle(x1 + 10, CABECERA - 30, x2 - 10, CABECERA - 8,
+                           fill=color, outline="", tags=et)
+        c.create_text((x1 + x2) / 2, CABECERA - 19, text=texto,
+                      fill="#0f1a12", font=("Segoe UI", 9, "bold"), tags=et)
 
     def _tarjeta(self, columna, i, b, x1, x2, y):
         c = self.lienzo

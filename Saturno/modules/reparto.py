@@ -241,6 +241,13 @@ class VistaReparto:
                     "bloques": self._bloques_de(reservas, regla_de),
                     "plazas": plazas,
                     "ocup": sum(r["adultos"] + r["ninos"] for r in reservas),
+                    # Los que tienen este salon pero no han cabido en ninguna
+                    # de sus mesas: hay que hacerles sitio o llevarlos a otro.
+                    "sin_sentar": sum(
+                        r["adultos"] + r["ninos"] for r in reservas
+                        if not self.con.execute(
+                            "SELECT 1 FROM asignacion WHERE reserva_id = ?",
+                            (r["id"],)).fetchone()),
                 })
 
         vivas = {r["id"] for c in self.columnas
@@ -348,6 +355,9 @@ class VistaReparto:
                                        40, fill=VERDE, outline="", tags=et)
             texto = "quedan %d plazas" % libres
             color = T("text_dim")
+            if columna["sin_sentar"]:
+                texto = "%d sin mesa: no caben" % columna["sin_sentar"]
+                color = ROJO
             if es_destino:
                 texto = ("caben los %d" % pax_sel) if cabe else \
                     ("faltan %d plazas" % (pax_sel - libres))
@@ -576,14 +586,21 @@ class VistaReparto:
             self.con.executemany(
                 "DELETE FROM asignacion WHERE reserva_id = ?",
                 [(r,) for r in ids])
+        # Y se sientan en el acto. Antes habia que acordarse de pulsar
+        # «Asignar mesas» aparte, y hasta entonces el plano salia vacio
+        # aunque el reparto estuviera hecho.
+        motor.asignar(self.con, self.evento_id)
         self.seleccion.clear()
         self.al_mostrar()
 
     def _asignar(self):
         res = motor.asignar(self.con, self.evento_id)
         texto = "%d reservas sentadas en su mesa." % res["asignadas"]
+        if res["pax_sin_decidir"]:
+            texto += ("\n\n%d comensales siguen sin salon: estan en POR"
+                      " REPARTIR." % res["pax_sin_decidir"])
         if res["pax_sin_sitio"]:
-            texto += ("\n\n%d comensales no caben en el salon que les has"
+            texto += ("\n\n%d comensales NO CABEN en el salon que les has"
                       " dado." % res["pax_sin_sitio"])
         messagebox.showinfo("Mesas asignadas", texto, parent=self.frame)
         self.al_mostrar()

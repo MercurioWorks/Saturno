@@ -164,6 +164,7 @@ def asignar(con, evento_id, respetar_fijadas=True):
 
     nuevas = []
     sin_sitio = []
+    sin_decidir = []
 
     excluidas = []
 
@@ -212,6 +213,9 @@ def asignar(con, evento_id, respetar_fijadas=True):
         if sitios is None:
             excluidas.append(("grupo " + nombre, total))
             continue
+        if not sitios:
+            sin_decidir.append(("grupo " + nombre, total))
+            continue
         for estirar in (False, True):
             for salon_id, zona in sitios:
                 tope = salones[salon_id]["capacidad_max"]
@@ -234,6 +238,11 @@ def asignar(con, evento_id, respetar_fijadas=True):
         sitios = destinos_para(r)
         if sitios is None:
             excluidas.append((r["cliente"], pax))
+            continue
+        if not sitios:
+            # Todavia no se ha decidido a que salon va: espera en Reparto.
+            # No es que no quepa, asi que no se cuenta como sin sitio.
+            sin_decidir.append((r["cliente"], pax))
             continue
         if not _sentar_reserva(r, pax, sitios, mesas_de, salones, nuevas,
                                puede_ampliar, ampliadas):
@@ -259,6 +268,8 @@ def asignar(con, evento_id, respetar_fijadas=True):
         "pax_sin_sitio": sum(p for _, p in sin_sitio),
         "excluidas": excluidas,
         "pax_excluidas": sum(p for _, p in excluidas),
+        "sin_decidir": sin_decidir,
+        "pax_sin_decidir": sum(p for _, p in sin_decidir),
     }
 
 

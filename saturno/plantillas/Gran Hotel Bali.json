@@ -1,0 +1,104 @@
+{
+  "salones": [
+    {
+      "nombre": "PALACIO DE CRISTAL",
+      "orden": 1,
+      "capacidad_base": 10,
+      "capacidad_max": 12,
+      "mesas_ampliables": 0,
+      "precio_menu": 0.0,
+      "zonas": [
+        {
+          "nombre": "",
+          "mesas": 46,
+          "grandes": 2
+        },
+        {
+          "nombre": "NAYA",
+          "mesas": 17,
+          "grandes": 0
+        }
+      ]
+    },
+    {
+      "nombre": "TERRAZA DE CRISTAL",
+      "orden": 2,
+      "capacidad_base": 10,
+      "capacidad_max": 12,
+      "mesas_ampliables": 0,
+      "precio_menu": 0.0,
+      "zonas": [
+        {
+          "nombre": "",
+          "mesas": 18,
+          "grandes": 0
+        }
+      ]
+    },
+    {
+      "nombre": "BORDON",
+      "orden": 3,
+      "capacidad_base": 10,
+      "capacidad_max": 12,
+      "mesas_ampliables": 0,
+      "precio_menu": 0.0,
+      "zonas": [
+        {
+          "nombre": "",
+          "mesas": 38,
+          "grandes": 1
+        }
+      ]
+    }
+  ],
+  "segmentos": [
+    {
+      "nombre": "DIRECTO",
+      "orden": 1,
+      "excluir": false,
+      "salon": "PALACIO DE CRISTAL",
+      "zona": "",
+      "codigos": [
+        "0",
+        "1000",
+        "2000",
+        "3000",
+        "10020"
+      ],
+      "patrones": [],
+      "min_pax": null,
+      "por_defecto": false
+    },
+    {
+      "nombre": "IMSERSO",
+      "orden": 2,
+      "excluir": true,
+      "salon": "",
+      "zona": "",
+      "codigos": [
+        "95"
+      ],
+      "patrones": [
+        "IMSERSO",
+        "MUNDOSENIOR",
+        "MUNDIPLAN"
+      ],
+      "min_pax": null,
+      "por_defecto": false
+    },
+    {
+      "nombre": "INGLESAS",
+      "orden": 3,
+      "excluir": false,
+      "salon": "BORDON",
+      "zona": "",
+      "codigos": [],
+      "patrones": [
+        "JET2",
+        "TUI"
+      ],
+      "min_pax": null,
+      "por_defecto": false
+    }
+  ]
+}

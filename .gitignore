@@ -1,0 +1,64 @@
+# ── Python ───────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+*.spec
+!saturno.spec
+
+# ── Entorno virtual ───────────────────────────────────────
+venv/
+.venv/
+env/
+Lib/
+Scripts/
+Include/
+
+# ── Base de datos ─────────────────────────────────────────
+# Los .db NO se suben: llevan las reservas reales, con nombres y
+# apellidos de los clientes.
+*.db
+*.db-shm
+*.db-wal
+
+# ── Listados y planos con datos de clientes ───────────────
+# Lo que sale del PMS y lo que se exporta lleva nombres de clientes.
+*.xls
+*.xlsx
+*.csv
+
+# ── Planos de salon cargados por el usuario ───────────────
+saturno/planos/
+
+# ── Logs ──────────────────────────────────────────────────
+logs/
+*.log
+
+# ── Compilacion / distribucion ────────────────────────────
+*.exe
+*.msi
+*.zip
+dist_output/
+
+# ── Windows ───────────────────────────────────────────────
+Thumbs.db
+desktop.ini
+ehthumbs.db
+$RECYCLE.BIN/
+
+# ── IDE / editores ────────────────────────────────────────
+.vscode/
+.idea/
+*.suo
+*.user
+
+# ── Temporales ────────────────────────────────────────────
+*.tmp
+*.temp
+~$*
+
+# ── Claves y configuracion sensible ──────────────────────
+.env

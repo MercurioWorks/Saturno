@@ -88,8 +88,7 @@ class VistaPlano:
         cuerpo.pack(fill="both", expand=True)
 
         marco = tk.Frame(cuerpo, bg=T("bg_content"))
-        marco.pack(side="left", fill="both", expand=True, padx=(12, 6),
-                   pady=12)
+        marco.pack(fill="both", expand=True, padx=12, pady=12)
         self.lienzo = tk.Canvas(marco, bg=T("bg_content"),
                                 highlightthickness=0)
         barra = tk.Scrollbar(marco, orient="vertical",
@@ -105,28 +104,6 @@ class VistaPlano:
         self.lienzo.bind("<MouseWheel>", self._rueda)
         self.lienzo.bind("<Configure>", self._al_redimensionar)
         self._ancho_pintado = 0
-
-        # Panel de pendientes, tambien en lienzo para que vaya suelto.
-        lateral = tk.Frame(cuerpo, bg=T("bg_card"), width=350)
-        lateral.pack(side="right", fill="y", padx=(6, 12), pady=12)
-        lateral.pack_propagate(False)
-        self.titulo_pendientes = tk.Label(
-            lateral, text="Sin sitio", bg=T("bg_card"), fg=T("text_primary"),
-            font=("Segoe UI", 12, "bold"), anchor="w")
-        self.titulo_pendientes.pack(fill="x", padx=14, pady=(12, 0))
-        tk.Label(lateral, text="No caben en su salon. Arrastralas a una mesa.",
-                 bg=T("bg_card"),
-                 fg=T("text_dim"), font=("Segoe UI", 9),
-                 anchor="w").pack(fill="x", padx=14, pady=(0, 8))
-        self.lienzo_pend = tk.Canvas(lateral, bg=T("bg_card"),
-                                     highlightthickness=0)
-        self.lienzo_pend.pack(fill="both", expand=True, padx=8, pady=(0, 10))
-        self.lienzo_pend.bind("<Button-1>", self._pulsar_pendiente)
-        self.lienzo_pend.bind("<B1-Motion>", self._arrastrar)
-        self.lienzo_pend.bind("<ButtonRelease-1>", self._soltar)
-        self.lienzo_pend.bind(
-            "<MouseWheel>",
-            lambda e: self.lienzo_pend.yview_scroll(-e.delta // 120, "units"))
 
     def _rueda(self, evento):
         self.lienzo.yview_scroll(-evento.delta // 120, "units")
@@ -152,7 +129,6 @@ class VistaPlano:
             self.salon_activo = (self.salones[0]["id"], "")
         self._pintar_cinta()
         self._pintar_lienzo()
-        self._pintar_pendientes()
 
     def _zonas(self, salon_id):
         return [f["zona"] for f in self.con.execute(
@@ -384,137 +360,6 @@ class VistaPlano:
             self._zonas_mesa.append((100, y - 4, x + 10, y + PLAZA_LADO + 4,
                                      mesa["id"]))
 
-    # ── Pendientes ────────────────────────────────────────────────
-
-    def _pintar_pendientes(self):
-        """Los que no caben en su salon, con lo que hace falta para decidir.
-
-        Con un nombre y un numero no se puede colocar a nadie: aqui van la
-        reserva, la agencia, los adultos y los ninos, y a que salon le tocaba
-        ir, agrupados por segmento y con las plazas que quedan en cada sitio.
-        """
-        c = self.lienzo_pend
-        c.delete("all")
-        todas = list(self.con.execute(
-            "SELECT r.id reserva_id, r.num_reserva, r.cliente, r.agencia,"
-            "       r.cod_agencia, r.adultos, r.ninos, r.externa,"
-            "       r.adultos + r.ninos pax"
-            " FROM reserva r WHERE r.evento_id = ?"
-            "   AND NOT EXISTS (SELECT 1 FROM asignacion a"
-            "                   WHERE a.reserva_id = r.id)"
-            " ORDER BY r.adultos + r.ninos DESC, r.cliente",
-            (self.evento_id,)))
-        segmentos, destinos, excluidos = motor.cargar_reglas(
-            self.con, self.evento_id)
-        nombres_seg = {f["id"]: f["nombre"] for f in self.con.execute(
-            "SELECT id, nombre FROM segmento WHERE evento_id = ?",
-            (self.evento_id,))}
-        salones = {f["id"]: f["nombre"] for f in self.con.execute(
-            "SELECT id, nombre FROM salon WHERE evento_id = ?",
-            (self.evento_id,))}
-
-        # Agrupados por el salon al que les tocaba ir.
-        grupos = {}
-        for s in todas:
-            seg = motor.segmento_de(s, segmentos)
-            if seg in excluidos:
-                continue
-            sitio = (destinos.get(seg) or [(None, "")])[0]
-            grupos.setdefault((seg, sitio), []).append(s)
-
-        self._pendientes = []
-        total = sum(sum(x["pax"] for x in v) for v in grupos.values())
-        self.titulo_pendientes.configure(text="Sin sitio  (%d pax)" % total)
-
-        ANCHO = 330
-        y = 6
-        for (seg, sitio), reservas in sorted(
-                grupos.items(), key=lambda kv: -sum(x["pax"] for x in kv[1])):
-            salon_id, zona = sitio
-            nombre_sitio = zona or salones.get(salon_id, "sin salon")
-            libres = 0
-            if salon_id:
-                libres = self.con.execute(
-                    "SELECT COALESCE(SUM(m.capacidad),0) -"
-                    " COALESCE(SUM((SELECT SUM(pax) FROM asignacion"
-                    "               WHERE mesa_id = m.id)),0)"
-                    " FROM mesa m WHERE m.salon_id = ? AND m.zona = ?",
-                    (salon_id, zona)).fetchone()[0]
-
-            c.create_text(6, y, anchor="nw",
-                          text="%s  ·  les tocaba %s"
-                               % (nombres_seg.get(seg, "?"), nombre_sitio),
-                          fill=T("text_secondary"),
-                          font=("Segoe UI", 9, "bold"))
-            y += 15
-            c.create_text(6, y, anchor="nw",
-                          text="ese salon esta lleno" if libres <= 0
-                          else "quedan %d plazas ahi" % libres,
-                          fill=ROJO if libres <= 0 else T("text_dim"),
-                          font=("Segoe UI", 8))
-            y += 16
-
-            for s in reservas:
-                i = len(self._pendientes)
-                self._pendientes.append(s)
-                etiqueta = "pend:%d" % i
-                c.create_rectangle(2, y, ANCHO, y + 34, fill=T("bg_surface"),
-                                   outline="", tags=etiqueta)
-                c.create_text(8, y + 10, anchor="w",
-                              text=s["num_reserva"] or ("EXT" if s["externa"]
-                                                        else ""),
-                              fill=T("text_dim"), font=("Consolas", 8),
-                              tags=etiqueta)
-                c.create_text(62, y + 10, anchor="w",
-                              text=corto(s["cliente"], 26),
-                              fill=T("text_primary"), font=("Segoe UI", 9),
-                              tags=etiqueta)
-                pax = "%d AD" % s["adultos"]
-                if s["ninos"]:
-                    pax += " + %d N" % s["ninos"]
-                c.create_text(ANCHO - 8, y + 10, anchor="e", text=pax,
-                              fill=ORO if s["ninos"] else T("text_primary"),
-                              font=("Segoe UI", 9,
-                                    "bold" if s["ninos"] else "normal"),
-                              tags=etiqueta)
-                c.create_text(62, y + 24, anchor="w",
-                              text=corto(s["agencia"] or "sin agencia", 34),
-                              fill=T("text_dim"), font=("Segoe UI", 8),
-                              tags=etiqueta)
-                c.create_text(8, y + 24, anchor="w",
-                              text=s["cod_agencia"], fill=T("text_dim"),
-                              font=("Consolas", 8), tags=etiqueta)
-                y += 36
-            y += 10
-
-        # Donde queda hueco, para saber adonde llevarlos.
-        if self._pendientes:
-            y += 4
-            c.create_text(6, y, anchor="nw", text="DONDE QUEDA SITIO",
-                          fill=T("table_head_fg"),
-                          font=("Segoe UI", 9, "bold"))
-            y += 18
-            for f in self.con.execute(
-                "SELECT s.nombre, m.zona,"
-                " COALESCE(SUM(m.capacidad),0) -"
-                " COALESCE(SUM((SELECT SUM(pax) FROM asignacion"
-                "               WHERE mesa_id = m.id)),0) libres"
-                " FROM mesa m JOIN salon s ON s.id = m.salon_id"
-                " WHERE s.evento_id = ? GROUP BY s.id, m.zona"
-                " ORDER BY libres DESC", (self.evento_id,)
-            ):
-                if f["libres"] <= 0:
-                    continue
-                c.create_text(8, y, anchor="nw",
-                              text=f["zona"] or f["nombre"],
-                              fill=T("text_secondary"),
-                              font=("Segoe UI", 9))
-                c.create_text(ANCHO - 8, y, anchor="ne",
-                              text="%d plazas" % f["libres"], fill=ORO,
-                              font=("Segoe UI", 9, "bold"))
-                y += 18
-        c.configure(scrollregion=c.bbox("all"))
-
     # ── Arrastrar y soltar ────────────────────────────────────────
 
     def _etiqueta_bajo(self, lienzo, evento, prefijo):
@@ -541,16 +386,6 @@ class VistaPlano:
                           "cliente": f["cliente"], "origen": f["mesa_id"]}
         self._crear_chip(evento)
 
-    def _pulsar_pendiente(self, evento):
-        indice = self._etiqueta_bajo(self.lienzo_pend, evento, "pend:")
-        if indice is None or indice >= len(self._pendientes):
-            return
-        s = self._pendientes[indice]
-        self._arrastre = {"id": None, "reserva_id": s["reserva_id"],
-                          "pax": s["pax"], "cliente": s["cliente"],
-                          "origen": None}
-        self._crear_chip(evento, self.lienzo_pend)
-
     def _crear_chip(self, evento, origen=None):
         """El rotulo que va pegado al raton mientras se arrastra."""
         self._borrar_chip()
@@ -568,17 +403,9 @@ class VistaPlano:
         ]
 
     def _raton_en_lienzo(self, evento, origen=None):
-        """Coordenadas del raton dentro del lienzo principal.
-
-        Cuando se arrastra desde el panel lateral hay que traducir, porque
-        el evento viene con las coordenadas de ese otro lienzo.
-        """
-        if origen is None or origen is self.lienzo:
-            return (self.lienzo.canvasx(evento.x) + 12,
-                    self.lienzo.canvasy(evento.y) + 12)
-        gx = origen.winfo_rootx() + evento.x - self.lienzo.winfo_rootx()
-        gy = origen.winfo_rooty() + evento.y - self.lienzo.winfo_rooty()
-        return self.lienzo.canvasx(gx) + 12, self.lienzo.canvasy(gy) + 12
+        """Coordenadas del raton dentro del lienzo."""
+        return (self.lienzo.canvasx(evento.x) + 12,
+                self.lienzo.canvasy(evento.y) + 12)
 
     def _borrar_chip(self):
         self.lienzo.delete("chip")

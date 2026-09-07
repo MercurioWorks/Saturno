@@ -87,11 +87,12 @@ class VistaReparto:
                                 fg=T("text_secondary"),
                                 font=("Segoe UI", 10), anchor="w")
         self.resumen.pack(side="left", padx=20)
-        ctk.CTkButton(
-            pie, text="Quitar seleccion", width=130, height=26,
+        self.boton_limpiar = ctk.CTkButton(
+            pie, text="Quitar seleccion  (Esc)", width=170, height=26,
             corner_radius=6, fg_color="transparent", border_width=1,
             border_color=T("border_card"), text_color=T("text_secondary"),
-            command=self._limpiar).pack(side="right", padx=20, pady=9)
+            command=self._limpiar)
+        self.boton_limpiar.pack(side="right", padx=20, pady=9)
 
         caja = tk.Frame(self.frame, bg=T("bg_content"))
         caja.pack(fill="both", expand=True, padx=12, pady=(10, 0))
@@ -132,6 +133,9 @@ class VistaReparto:
                          lambda e: self.lienzo.xview_scroll(-e.delta // 120,
                                                             "units"))
         self.lienzo.bind("<Configure>", lambda e: self._pintar())
+        # Dos maneras rapidas de soltar lo elegido: la tecla de escape y
+        # pinchar en cualquier hueco del tablero.
+        self.frame.winfo_toplevel().bind("<Escape>", self._escape, add="+")
 
     def _mover_horizontal(self, *args):
         """Desplaza a la vez las tarjetas y sus cabeceras."""
@@ -537,7 +541,14 @@ class VistaReparto:
             clave = (col, self.columnas[col]["bloques"][i]["titulo"])
             self.desplegados.symmetric_difference_update({clave})
             self._pintar()
+        elif que is None and self.seleccion:
+            self._limpiar()
 
+
+    def _escape(self, evento=None):
+        """Solo actua si el tablero es lo que se esta viendo."""
+        if self.frame.winfo_ismapped() and self.seleccion:
+            self._limpiar()
 
     def _mover_raton(self, evento):
         que, col, i = self._donde(evento)
@@ -606,6 +617,13 @@ class VistaReparto:
         self.al_mostrar()
 
     def _pintar_resumen(self):
+        # El boton se enciende solo cuando hay algo que quitar.
+        if self.seleccion:
+            self.boton_limpiar.configure(border_color=ORO,
+                                         text_color=T("text_primary"))
+        else:
+            self.boton_limpiar.configure(border_color=T("border_card"),
+                                         text_color=T("text_secondary"))
         if not self.seleccion:
             self.resumen.configure(
                 text="Pincha un bloque para ver sus reservas.   Marca la"

@@ -51,7 +51,7 @@ class VistaReparto:
         self.hover_columna = None
         self._cajas = []          # (x1, y1, x2, y2, columna, indice)
         self._cajas_reserva = []  # (x1, y1, x2, y2, columna, reserva)
-        self._plegables = []      # (x1, y1, x2, y2, columna, indice)
+        self._casillas = []       # (x1, y1, x2, y2, columna, indice)
         self._cabeceras = []      # (x1, y1, x2, y2, columna)
 
         self.frame = ctk.CTkFrame(padre, fg_color=T("bg_content"),
@@ -93,18 +93,34 @@ class VistaReparto:
             border_color=T("border_card"), text_color=T("text_secondary"),
             command=self._limpiar).pack(side="right", padx=20, pady=9)
 
-        marco = tk.Frame(self.frame, bg=T("bg_content"))
-        marco.pack(fill="both", expand=True, padx=12, pady=(10, 0))
+        caja = tk.Frame(self.frame, bg=T("bg_content"))
+        caja.pack(fill="both", expand=True, padx=12, pady=(10, 0))
+
+        # Las cabeceras van en su propio lienzo, que no se desplaza en
+        # vertical: son los destinos y tienen que estar siempre a mano.
+        self.lienzo_cab = tk.Canvas(caja, bg=T("bg_content"),
+                                    height=CABECERA + 6,
+                                    highlightthickness=0)
+        self.lienzo_cab.pack(side="top", fill="x")
+
+        marco = tk.Frame(caja, bg=T("bg_content"))
+        marco.pack(side="top", fill="both", expand=True)
         self.lienzo = tk.Canvas(marco, bg=T("bg_content"),
                                 highlightthickness=0)
         vbar = tk.Scrollbar(marco, orient="vertical",
                             command=self.lienzo.yview)
         vbar.pack(side="right", fill="y")
         hbar = tk.Scrollbar(marco, orient="horizontal",
-                            command=self.lienzo.xview)
+                            command=self._mover_horizontal)
         hbar.pack(side="bottom", fill="x")
-        self.lienzo.configure(yscrollcommand=vbar.set, xscrollcommand=hbar.set)
+        self._hbar = hbar
+        self.lienzo.configure(yscrollcommand=vbar.set,
+                              xscrollcommand=self._al_mover_x)
         self.lienzo.pack(side="left", fill="both", expand=True)
+
+        self.lienzo_cab.bind("<Button-1>", self._pulsar_cabecera)
+        self.lienzo_cab.bind("<Motion>", self._mover_raton_cabecera)
+        self.lienzo_cab.bind("<Leave>", lambda e: self._quitar_hover())
 
         self.lienzo.bind("<Button-1>", self._pulsar)
         self.lienzo.bind("<Motion>", self._mover_raton)
@@ -116,6 +132,15 @@ class VistaReparto:
                          lambda e: self.lienzo.xview_scroll(-e.delta // 120,
                                                             "units"))
         self.lienzo.bind("<Configure>", lambda e: self._pintar())
+
+    def _mover_horizontal(self, *args):
+        """Desplaza a la vez las tarjetas y sus cabeceras."""
+        self.lienzo.xview(*args)
+        self.lienzo_cab.xview(*args)
+
+    def _al_mover_x(self, inicio, fin):
+        self._hbar.set(inicio, fin)
+        self.lienzo_cab.xview_moveto(inicio)
 
     # ── Datos ─────────────────────────────────────────────────────
 
@@ -223,8 +248,8 @@ class VistaReparto:
         self.seleccion &= vivas
         pend = sum(b["pax"] for b in self.columnas[0]["bloques"])
         self.subtitulo.configure(
-            text="   %d comensales por repartir   ·   elige bloques y pincha"
-                 " la cabecera del salon donde van" % pend)
+            text="   %d comensales por repartir   ·   pincha un bloque para"
+                 " abrirlo, marca su casilla para moverlo" % pend)
 
     # ── Dibujo ────────────────────────────────────────────────────
 
@@ -246,14 +271,15 @@ class VistaReparto:
     def _pintar(self):
         c = self.lienzo
         c.delete("all")
+        self.lienzo_cab.delete("all")
         self._cajas, self._cabeceras = [], []
-        self._cajas_reserva, self._plegables = [], []
+        self._cajas_reserva, self._casillas = [], []
         pax_sel = self._pax_seleccionado()
 
         for indice, columna in enumerate(self.columnas):
             x1, x2 = self._x_columna(indice)
             self._cabecera_columna(indice, columna, x1, x2, pax_sel)
-            y = CABECERA + 10
+            y = 8
             for i, b in enumerate(columna["bloques"]):
                 self._tarjeta(indice, i, b, x1, x2, y)
                 y += TARJETA
@@ -261,12 +287,18 @@ class VistaReparto:
                     y = self._desplegar(indice, b, x1, x2, y)
                 y += HUECO
             if not columna["bloques"]:
-                c.create_text((x1 + x2) / 2, CABECERA + 34, text="vacio",
-                              fill=T("text_disabled"), font=("Segoe UI", 9))
-        c.configure(scrollregion=c.bbox("all"))
+                c.create_text((x1 + x2) / 2, 30, text="vacio",
+                              fill=T("text_disabled"),
+                              font=("Segoe UI", 9))
+        ancho = self._x_columna(len(self.columnas) - 1)[1] + 12
+        alto = max(c.bbox("all")[3] if c.bbox("all") else 0, 10)
+        c.configure(scrollregion=(0, 0, ancho, alto))
+        self.lienzo_cab.configure(scrollregion=(0, 0, ancho,
+                                                CABECERA + 6))
+        self.lienzo_cab.xview_moveto(self.lienzo.xview()[0])
 
     def _cabecera_columna(self, indice, columna, x1, x2, pax_sel):
-        c = self.lienzo
+        c = self.lienzo_cab
         es_destino = pax_sel > 0
         libres = None
         if columna["plazas"] is not None:
@@ -346,13 +378,18 @@ class VistaReparto:
         c.create_rectangle(x1 + 4, y, x1 + 8, y + TARJETA,
                            fill=ORO if b["grupo"] else T("border_card"),
                            outline="", tags=et)
-        # Triangulo para abrir el bloque y ver que reservas lo forman.
-        c.create_text(x1 + 18, y + 16, text="▾" if abierto else "▸",
-                      fill=T("text_secondary"), font=("Segoe UI", 9))
-        self._plegables.append((x1 + 8, y, x1 + 28, y + TARJETA,
-                                columna, i))
-        c.create_text(x1 + 32, y + 16, anchor="w",
-                      text=corto(b["titulo"], 29 if columna == 0 else 18),
+        # Casilla para elegir el bloque. Pinchar el resto de la tarjeta
+        # lo abre: ver que hay dentro tiene que ser lo mas facil.
+        marca = "■" if elegido else ("◪" if parcial else "□")
+        c.create_text(x1 + 20, y + 16, text=marca,
+                      fill=ORO if marcadas else T("text_dim"),
+                      font=("Segoe UI", 11))
+        self._casillas.append((x1 + 8, y, x1 + 32, y + TARJETA,
+                               columna, i))
+        c.create_text(x1 + 38, y + 14, text="▾" if abierto else "▸",
+                      fill=T("text_dim"), font=("Segoe UI", 8))
+        c.create_text(x1 + 48, y + 16, anchor="w",
+                      text=corto(b["titulo"], 26 if columna == 0 else 15),
                       fill=T("text_primary"), font=("Segoe UI", 10, "bold"),
                       tags=et)
         c.create_text(x2 - 12, y + 16, anchor="e", text=str(b["pax"]),
@@ -364,8 +401,10 @@ class VistaReparto:
         if parcial:
             detalle = "%d de %d reservas marcadas" % (marcadas,
                                                      len(b["reservas"]))
-        c.create_text(x1 + 32, y + 38, anchor="w",
-                      text=corto(detalle, 33 if columna == 0 else 21),
+        if not abierto and len(b["reservas"]) > 1:
+            detalle += "  ·  pincha para ver cuales"
+        c.create_text(x1 + 48, y + 38, anchor="w",
+                      text=corto(detalle, 46 if columna == 0 else 24),
                       fill=T("text_dim"), font=("Segoe UI", 8), tags=et)
         if b["ninos"]:
             c.create_text(x2 - 12, y + 38, anchor="e",
@@ -376,6 +415,21 @@ class VistaReparto:
     def _desplegar(self, columna, b, x1, x2, y):
         """Las reservas del bloque, una a una y marcables por separado."""
         c = self.lienzo
+        # Cabecera de columnas, las mismas que en el plano y en la hoja.
+        col_ad, col_n = x2 - 46, x2 - 14
+        c.create_text(x1 + 38, y + 8, anchor="w", text="RSV",
+                      fill=T("table_head_fg"),
+                      font=("Segoe UI", 7, "bold"))
+        c.create_text(x1 + 88, y + 8, anchor="w", text="NOMBRE",
+                      fill=T("table_head_fg"),
+                      font=("Segoe UI", 7, "bold"))
+        c.create_text(col_ad, y + 8, anchor="e", text="AD",
+                      fill=T("table_head_fg"),
+                      font=("Segoe UI", 7, "bold"))
+        c.create_text(col_n, y + 8, anchor="e", text="N",
+                      fill=T("table_head_fg"),
+                      font=("Segoe UI", 7, "bold"))
+        y += 14
         for r in sorted(b["detalle_reservas"],
                         key=lambda x: -(x["adultos"] + x["ninos"])):
             marcada = r["id"] in self.seleccion
@@ -389,16 +443,16 @@ class VistaReparto:
             c.create_text(x1 + 38, y + 11, anchor="w",
                           text=r["num_reserva"] or "EXT",
                           fill=T("text_dim"), font=("Consolas", 8))
-            c.create_text(x1 + 86, y + 11, anchor="w",
+            c.create_text(x1 + 88, y + 11, anchor="w",
                           text=corto(r["cliente"],
-                                     24 if columna == 0 else 12),
+                                     20 if columna == 0 else 9),
                           fill=T("text_primary"), font=("Segoe UI", 8))
-            pax = "%d" % r["adultos"]
-            if r["ninos"]:
-                pax += "+%dN" % r["ninos"]
-            c.create_text(x2 - 12, y + 11, anchor="e", text=pax,
-                          fill=ORO if r["ninos"] else T("text_secondary"),
-                          font=("Segoe UI", 8))
+            c.create_text(col_ad, y + 11, anchor="e",
+                          text=str(r["adultos"]),
+                          fill=T("text_secondary"), font=("Segoe UI", 8))
+            c.create_text(col_n, y + 11, anchor="e",
+                          text=str(r["ninos"]) if r["ninos"] else "",
+                          fill=ORO, font=("Segoe UI", 8, "bold"))
             self._cajas_reserva.append((x1 + 14, y, x2 - 4,
                                         y + FILA_RESERVA, columna,
                                         r["id"]))
@@ -410,32 +464,42 @@ class VistaReparto:
     def _donde(self, evento):
         x = self.lienzo.canvasx(evento.x)
         y = self.lienzo.canvasy(evento.y)
-        for x1, y1, x2, y2, col, i in self._plegables:
+        for x1, y1, x2, y2, col, i in self._casillas:
             if x1 <= x <= x2 and y1 <= y <= y2:
-                return ("plegar", col, i)
+                return ("casilla", col, i)
         for x1, y1, x2, y2, col, rid in self._cajas_reserva:
             if x1 <= x <= x2 and y1 <= y <= y2:
                 return ("reserva", col, rid)
         for x1, y1, x2, y2, col, i in self._cajas:
             if x1 <= x <= x2 and y1 <= y <= y2:
                 return ("tarjeta", col, i)
-        for x1, y1, x2, y2, col in self._cabeceras:
-            if x1 <= x <= x2 and y1 <= y <= y2:
-                return ("columna", col, None)
         return (None, None, None)
+
+    def _columna_en(self, evento):
+        x = self.lienzo_cab.canvasx(evento.x)
+        for x1, y1, x2, y2, col in self._cabeceras:
+            if x1 <= x <= x2:
+                return col
+        return None
+
+    def _pulsar_cabecera(self, evento):
+        col = self._columna_en(evento)
+        if col is not None and self.seleccion:
+            self._mandar(self.columnas[col])
+
+    def _mover_raton_cabecera(self, evento):
+        col = self._columna_en(evento)
+        if col != self.hover_columna:
+            self.hover_columna = col
+            self.lienzo_cab.configure(
+                cursor="hand2" if col is not None and self.seleccion
+                else "")
+            self._pintar()
 
     def _pulsar(self, evento):
         que, col, i = self._donde(evento)
-        if que == "plegar":
-            clave = (col, self.columnas[col]["bloques"][i]["titulo"])
-            self.desplegados.symmetric_difference_update({clave})
-            self._pintar()
-        elif que == "reserva":
-            self.seleccion.symmetric_difference_update({i})
-            self._pintar()
-            self._pintar_resumen()
-        elif que == "tarjeta":
-            # Pinchar el bloque marca o desmarca todas sus reservas.
+        if que == "casilla":
+            # La casilla elige o desmarca el bloque entero.
             ids = set(self.columnas[col]["bloques"][i]["reservas"])
             if ids <= self.seleccion:
                 self.seleccion -= ids
@@ -443,12 +507,20 @@ class VistaReparto:
                 self.seleccion |= ids
             self._pintar()
             self._pintar_resumen()
-        elif que == "columna" and self.seleccion:
-            self._mandar(self.columnas[col])
+        elif que == "reserva":
+            self.seleccion.symmetric_difference_update({i})
+            self._pintar()
+            self._pintar_resumen()
+        elif que == "tarjeta":
+            # Pinchar la tarjeta la abre y ensena sus reservas.
+            clave = (col, self.columnas[col]["bloques"][i]["titulo"])
+            self.desplegados.symmetric_difference_update({clave})
+            self._pintar()
+
 
     def _mover_raton(self, evento):
         que, col, i = self._donde(evento)
-        tarjeta = (col, i) if que in ("tarjeta", "plegar") else None
+        tarjeta = (col, i) if que in ("tarjeta", "casilla") else None
         columna = col if que == "columna" else None
         if tarjeta != self.hover or columna != self.hover_columna:
             self.hover, self.hover_columna = tarjeta, columna
@@ -508,9 +580,10 @@ class VistaReparto:
     def _pintar_resumen(self):
         if not self.seleccion:
             self.resumen.configure(
-                text="Pincha los bloques que quieras mover y luego la"
-                     " cabecera de la columna a donde van."
-                     "   Para revertir algo, mandalo a POR REPARTIR.")
+                text="Pincha un bloque para ver sus reservas.   Marca la"
+                     " casilla de lo que quieras mover y despues pincha la"
+                     " cabecera del salon.   Para revertir, mandalo a POR"
+                     " REPARTIR.")
             return
         pax = self._pax_seleccionado()
         ninos = sum(r["ninos"] for c in self.columnas

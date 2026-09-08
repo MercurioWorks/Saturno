@@ -145,7 +145,9 @@ class VistaConfiguracion:
             for j, z in enumerate(zonas):
                 if j == 0:
                     # Primera fila: el salon, con sus botones.
-                    valores = (s["nombre"], z["zona"] or "principal",
+                    valores = (s["nombre"] + ("" if s["gestionado"]
+                                              else "   (no se reparte)"),
+                               z["zona"] or "principal",
                                "%d-%d" % (z["a"], z["b"]),
                                str(z["n"] - (z["g"] or 0)),
                                str(z["g"] or 0), str(z["plazas"]),
@@ -388,7 +390,7 @@ class VentanaSalon(_Dialogo):
     """Alta y edicion de un salon con sus zonas."""
 
     def __init__(self, padre, con, evento_id, salon_id, al_guardar):
-        super().__init__(padre, "Salon", 620, 640)
+        super().__init__(padre, "Salon", 620, 700)
         self.con = con
         self.evento_id = evento_id
         self.salon_id = salon_id
@@ -420,6 +422,15 @@ class VentanaSalon(_Dialogo):
         self.ampliables = self._campo(
             der, "Mesas que admiten sillas de mas",
             salon["mesas_ampliables"] if salon else 0, 180)
+
+        # Un salon puede existir solo para contar: el que lleva otra persona
+        # suma sus plazas al total del hotel pero no se reparte aqui.
+        self.gestionado = ctk.CTkCheckBox(
+            self, text="Se reparte en este salon (si no, solo cuenta en el"
+                       " resumen)")
+        self.gestionado.pack(anchor="w", padx=24, pady=(14, 0))
+        if salon is None or salon["gestionado"]:
+            self.gestionado.select()
 
         tk.Label(self, text="Zonas del salon", bg=T("bg_content"),
                  fg=T("text_primary"), font=("Segoe UI", 11, "bold"),
@@ -534,17 +545,19 @@ class VentanaSalon(_Dialogo):
                 cur = self.con.execute(
                     "INSERT INTO salon (evento_id, nombre, orden,"
                     " capacidad_base, capacidad_max, mesas_ampliables,"
-                    " num_mesas) VALUES (?,?,?,?,?,?,0)",
+                    " gestionado, num_mesas) VALUES (?,?,?,?,?,?,?,0)",
                     (self.evento_id, nombre, self._entero(self.orden, 1),
-                     cap_base, cap_max, self._entero(self.ampliables)))
+                     cap_base, cap_max, self._entero(self.ampliables),
+                     1 if self.gestionado.get() else 0))
                 self.salon_id = cur.lastrowid
             else:
                 self.con.execute(
                     "UPDATE salon SET nombre = ?, orden = ?,"
                     " capacidad_base = ?, capacidad_max = ?,"
-                    " mesas_ampliables = ? WHERE id = ?",
+                    " mesas_ampliables = ?, gestionado = ? WHERE id = ?",
                     (nombre, self._entero(self.orden, 1), cap_base, cap_max,
-                     self._entero(self.ampliables), self.salon_id))
+                     self._entero(self.ampliables),
+                     1 if self.gestionado.get() else 0, self.salon_id))
 
         if not self._aplicar_zonas(zonas, cap_base, cap_max):
             return

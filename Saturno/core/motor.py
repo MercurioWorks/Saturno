@@ -129,6 +129,7 @@ def asignar(con, evento_id, respetar_fijadas=True):
         # una peticion se quedarian puestas para siempre.
         m.capacidad = (f["capacidad_montaje"]
                        or salones[m.salon_id]["capacidad_base"])
+        m.capacidad_guardada = f["capacidad"]
         mesas[m.id] = m
         mesas_por_salon[m.salon_id].append(m)
 
@@ -260,9 +261,12 @@ def asignar(con, evento_id, respetar_fijadas=True):
         con.executemany(
             "INSERT INTO asignacion (reserva_id, mesa_id, pax, fijada)"
             " VALUES (?,?,?,0)", nuevas)
-        for m in mesas.values():
-            con.execute("UPDATE mesa SET capacidad = ? WHERE id = ?",
-                        (m.capacidad, m.id))
+        # Solo se escriben las mesas cuya capacidad ha cambiado de verdad:
+        # antes se reescribian las 122 en cada calculo.
+        con.executemany(
+            "UPDATE mesa SET capacidad = ? WHERE id = ?",
+            [(m.capacidad, m.id) for m in mesas.values()
+             if m.capacidad != m.capacidad_guardada])
 
     return {
         "asignadas": len(nuevas),

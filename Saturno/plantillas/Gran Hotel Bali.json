@@ -7,6 +7,7 @@
       "capacidad_max": 12,
       "mesas_ampliables": 0,
       "precio_menu": 0.0,
+      "gestionado": true,
       "zonas": [
         {
           "nombre": "",
@@ -27,6 +28,7 @@
       "capacidad_max": 12,
       "mesas_ampliables": 0,
       "precio_menu": 0.0,
+      "gestionado": true,
       "zonas": [
         {
           "nombre": "",
@@ -42,6 +44,7 @@
       "capacidad_max": 12,
       "mesas_ampliables": 0,
       "precio_menu": 0.0,
+      "gestionado": true,
       "zonas": [
         {
           "nombre": "",
@@ -57,6 +60,7 @@
       "capacidad_max": 12,
       "mesas_ampliables": 0,
       "precio_menu": 0.0,
+      "gestionado": false,
       "zonas": [
         {
           "nombre": "",

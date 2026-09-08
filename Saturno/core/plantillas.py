@@ -54,7 +54,8 @@ def exportar(con, evento_id, nombre):
             "capacidad_base": s["capacidad_base"],
             "capacidad_max": s["capacidad_max"],
             "mesas_ampliables": s["mesas_ampliables"],
-            "precio_menu": s["precio_menu"], "zonas": zonas,
+            "precio_menu": s["precio_menu"],
+            "gestionado": bool(s["gestionado"]), "zonas": zonas,
         })
 
     for seg in con.execute(
@@ -104,12 +105,12 @@ def aplicar(con, evento_id, datos):
             total = sum(z["mesas"] + z.get("grandes", 0) for z in zonas)
             cur = con.execute(
                 "INSERT INTO salon (evento_id, nombre, orden, capacidad_base,"
-                " capacidad_max, mesas_ampliables, precio_menu, num_mesas)"
-                " VALUES (?,?,?,?,?,?,?,?)",
+                " capacidad_max, mesas_ampliables, precio_menu, gestionado,"
+                " num_mesas) VALUES (?,?,?,?,?,?,?,?,?)",
                 (evento_id, s["nombre"], s.get("orden", 0),
                  s.get("capacidad_base", 10), s.get("capacidad_max", 12),
                  s.get("mesas_ampliables", 0), s.get("precio_menu", 0),
-                 total))
+                 1 if s.get("gestionado", True) else 0, total))
             ids[s["nombre"]] = cur.lastrowid
             numero = 1
             for z in zonas:

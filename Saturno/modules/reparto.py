@@ -205,6 +205,12 @@ class VistaReparto:
             (self.evento_id,)))
         nombres = {s["id"]: s["nombre"] for s in salones}
 
+        # Quien esta sentado, de una vez: antes se preguntaba reserva a
+        # reserva y salian cientos de consultas por pantalla.
+        sentadas = {f["reserva_id"] for f in self.con.execute(
+            "SELECT DISTINCT a.reserva_id FROM asignacion a"
+            " JOIN reserva r ON r.id = a.reserva_id WHERE r.evento_id = ?",
+            (self.evento_id,))}
         por_sitio, pendientes, regla_de = {}, [], {}
         for r in self.con.execute(
             "SELECT * FROM reserva WHERE evento_id = ?"
@@ -250,11 +256,9 @@ class VistaReparto:
                     "ocup": sum(r["adultos"] + r["ninos"] for r in reservas),
                     # Los que tienen este salon pero no han cabido en ninguna
                     # de sus mesas: hay que hacerles sitio o llevarlos a otro.
-                    "sin_sentar": sum(
-                        r["adultos"] + r["ninos"] for r in reservas
-                        if not self.con.execute(
-                            "SELECT 1 FROM asignacion WHERE reserva_id = ?",
-                            (r["id"],)).fetchone()),
+                    "sin_sentar": sum(r["adultos"] + r["ninos"]
+                                      for r in reservas
+                                      if r["id"] not in sentadas),
                 })
 
         vivas = {r["id"] for c in self.columnas

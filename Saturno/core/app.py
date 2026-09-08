@@ -204,6 +204,11 @@ class SaturnoApp(ctk.CTk):
     def cambiar_evento(self, evento_id):
         """Pasa a trabajar en otro evento: se rehace todo con sus datos."""
         self.evento_id = evento_id
+        # Queda anotado para volver aqui la proxima vez que se abra.
+        with self.con:
+            self.con.execute("UPDATE evento SET activo = 0")
+            self.con.execute("UPDATE evento SET activo = 1 WHERE id = ?",
+                             (evento_id,))
         evento = self.con.execute("SELECT * FROM evento WHERE id = ?",
                                   (evento_id,)).fetchone()
         self.title("Saturno - %s" % (evento["nombre"] if evento else ""))

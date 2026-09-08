@@ -62,6 +62,11 @@ class VistaResumen:
     # ── Datos ─────────────────────────────────────────────────────
 
     def al_mostrar(self):
+        # Al repintar se vuelve a leer todo: la cache es solo para no repetir
+        # la misma consulta dentro de un mismo pintado.
+        for atributo in ("_cache_reglas", "_cache_reservas"):
+            if hasattr(self, atributo):
+                delattr(self, atributo)
         for w in self.cuerpo.winfo_children():
             w.destroy()
         evento = self.con.execute("SELECT * FROM evento WHERE id = ?",
@@ -94,9 +99,26 @@ class VistaResumen:
 
         self._total_hotel(filas, otros)
 
+    def _ocupacion_por_mesa(self):
+        """Adultos y ninos sentados en cada mesa, en una sola consulta."""
+        ocupacion = {}
+        for f in self.con.execute(
+            "SELECT a.mesa_id, a.pax, r.adultos FROM asignacion a"
+            " JOIN reserva r ON r.id = a.reserva_id"
+            " JOIN mesa m ON m.id = a.mesa_id"
+            " JOIN salon s ON s.id = m.salon_id WHERE s.evento_id = ?",
+            (self.evento_id,)
+        ):
+            adultos = min(f["pax"], f["adultos"])
+            d = ocupacion.setdefault(f["mesa_id"], [0, 0])
+            d[0] += adultos
+            d[1] += f["pax"] - adultos
+        return ocupacion
+
     def _filas(self, gestionados=True):
         """Una fila por zona de salon, con las cuentas de la hoja."""
         filas = []
+        ocupacion = self._ocupacion_por_mesa()
         for s in self.con.execute(
             "SELECT * FROM salon WHERE evento_id = ? AND gestionado = ?"
             " ORDER BY orden", (self.evento_id, 1 if gestionados else 0)
@@ -118,14 +140,9 @@ class VistaResumen:
                 ad = ni = 0
                 if s["gestionado"]:
                     for m in mesas:
-                        for o in self.con.execute(
-                            "SELECT a.pax, r.adultos FROM asignacion a"
-                            " JOIN reserva r ON r.id = a.reserva_id"
-                            " WHERE a.mesa_id = ?", (m["id"],)
-                        ):
-                            adultos = min(o["pax"], o["adultos"])
-                            ad += adultos
-                            ni += o["pax"] - adultos
+                        a, n = ocupacion.get(m["id"], (0, 0))
+                        ad += a
+                        ni += n
                 else:
                     # Aqui no se sientan mesas: se cuenta la gente que va a
                     # ese salon, que es lo que interesa para el total.
@@ -141,10 +158,14 @@ class VistaResumen:
 
     def _pax_de_salon(self, salon_id):
         """Adultos y ninos que van a un salon que no se reparte aqui."""
-        segmentos, destinos, _ = motor.cargar_reglas(self.con, self.evento_id)
+        if not hasattr(self, "_cache_reglas"):
+            self._cache_reglas = motor.cargar_reglas(self.con, self.evento_id)
+            self._cache_reservas = list(self.con.execute(
+                "SELECT * FROM reserva WHERE evento_id = ?",
+                (self.evento_id,)))
+        segmentos, destinos, _ = self._cache_reglas
         ad = ni = 0
-        for r in self.con.execute("SELECT * FROM reserva WHERE evento_id = ?",
-                                  (self.evento_id,)):
+        for r in self._cache_reservas:
             destino = r["salon_id"]
             if destino is None and not r["apartada"]:
                 seg = motor.segmento_de(r, segmentos)

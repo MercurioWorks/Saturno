@@ -26,6 +26,10 @@ def evento_de_trabajo(con):
         "SELECT id FROM evento WHERE activo = 1 ORDER BY id DESC").fetchone()
     if fila:
         return fila["id"]
+    fila = con.execute(
+        "SELECT id FROM evento ORDER BY id DESC").fetchone()
+    if fila:
+        return fila["id"]
     return plantillas.crear_evento(con, "NUEVO EVENTO", "")
 
 

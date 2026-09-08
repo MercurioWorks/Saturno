@@ -77,14 +77,30 @@ class VistaResumen:
 
         self._tabla("SALONES", filas)
         self._totales(filas)
+
+        otros = self._filas(gestionados=False)
+        if otros:
+            tk.Frame(self.cuerpo, height=24,
+                     bg=T("bg_content")).pack(fill="x")
+            self._tabla("SALONES QUE NO SE REPARTEN AQUI", otros)
+            plazas = sum(f["plazas"] for f in otros)
+            ad = sum(f["ad"] for f in otros)
+            ni = sum(f["ni"] for f in otros)
+            tk.Frame(self.cuerpo, height=8, bg=T("bg_content")).pack(fill="x")
+            self._linea("TOTAL PLAZAS", plazas, True)
+            self._linea("TOTAL PLAZAS DISPONIBLES", plazas - ad - ni, True,
+                        ORO if plazas - ad - ni else None)
+            self._linea("TOTAL PAX", ad + ni, True)
+
+        self._total_hotel(filas, otros)
         self._aparte()
 
-    def _filas(self):
+    def _filas(self, gestionados=True):
         """Una fila por zona de salon, con las cuentas de la hoja."""
         filas = []
         for s in self.con.execute(
-            "SELECT * FROM salon WHERE evento_id = ? ORDER BY orden",
-            (self.evento_id,)
+            "SELECT * FROM salon WHERE evento_id = ? AND gestionado = ?"
+            " ORDER BY orden", (self.evento_id, 1 if gestionados else 0)
         ):
             for z in self.con.execute(
                 "SELECT zona FROM mesa WHERE salon_id = ? GROUP BY zona"
@@ -101,15 +117,20 @@ class VistaResumen:
                 t2 = sum(m["capacidad_montaje"] for m in grandes)
 
                 ad = ni = 0
-                for m in mesas:
-                    for o in self.con.execute(
-                        "SELECT a.pax, r.adultos FROM asignacion a"
-                        " JOIN reserva r ON r.id = a.reserva_id"
-                        " WHERE a.mesa_id = ?", (m["id"],)
-                    ):
-                        adultos = min(o["pax"], o["adultos"])
-                        ad += adultos
-                        ni += o["pax"] - adultos
+                if s["gestionado"]:
+                    for m in mesas:
+                        for o in self.con.execute(
+                            "SELECT a.pax, r.adultos FROM asignacion a"
+                            " JOIN reserva r ON r.id = a.reserva_id"
+                            " WHERE a.mesa_id = ?", (m["id"],)
+                        ):
+                            adultos = min(o["pax"], o["adultos"])
+                            ad += adultos
+                            ni += o["pax"] - adultos
+                else:
+                    # Aqui no se sientan mesas: se cuenta la gente que va a
+                    # ese salon, que es lo que interesa para el total.
+                    ad, ni = self._pax_de_salon(s["id"])
                 filas.append({
                     "nombre": z["zona"] or s["nombre"],
                     "mesas": len(normales), "grandes": len(grandes),
@@ -118,6 +139,22 @@ class VistaResumen:
                     "rest": t1 + t2 - ad - ni,
                 })
         return filas
+
+    def _pax_de_salon(self, salon_id):
+        """Adultos y ninos que van a un salon que no se reparte aqui."""
+        segmentos, destinos, _ = motor.cargar_reglas(self.con, self.evento_id)
+        ad = ni = 0
+        for r in self.con.execute("SELECT * FROM reserva WHERE evento_id = ?",
+                                  (self.evento_id,)):
+            destino = r["salon_id"]
+            if destino is None and not r["apartada"]:
+                seg = motor.segmento_de(r, segmentos)
+                sitios = destinos.get(seg)
+                destino = sitios[0][0] if sitios else None
+            if destino == salon_id:
+                ad += r["adultos"]
+                ni += r["ninos"]
+        return ad, ni
 
     # ── Dibujo ────────────────────────────────────────────────────
 
@@ -170,6 +207,24 @@ class VistaResumen:
         tk.Frame(self.cuerpo, height=10,
                  bg=T("bg_content")).pack(fill="x")
         self._linea("TOTAL PLAZAS SALONES", plazas, True)
+        self._linea("TOTAL PLAZAS DISPONIBLES", plazas - ad - ni, True,
+                    ORO if plazas - ad - ni else None)
+        tk.Frame(self.cuerpo, height=8, bg=T("bg_content")).pack(fill="x")
+        self._linea("TOTAL ADULTOS Y NIÑOS", "%d  +  %d" % (ad, ni))
+        self._linea("TOTAL PAX", ad + ni, True)
+
+    def _total_hotel(self, filas, otros):
+        """Lo que en la hoja era el TOTAL GENERAL: todo el hotel junto."""
+        todas = filas + otros
+        plazas = sum(f["plazas"] for f in todas)
+        ad = sum(f["ad"] for f in todas)
+        ni = sum(f["ni"] for f in todas)
+
+        tk.Frame(self.cuerpo, height=26, bg=T("bg_content")).pack(fill="x")
+        tk.Label(self.cuerpo, text="TOTAL GENERAL", bg=T("bg_content"),
+                 fg=T("text_primary"), font=("Segoe UI", 12, "bold"),
+                 anchor="w").pack(fill="x", pady=(0, 6))
+        self._linea("TOTAL PLAZAS HOTEL", plazas, True)
         self._linea("TOTAL PLAZAS DISPONIBLES", plazas - ad - ni, True,
                     ORO if plazas - ad - ni else None)
         tk.Frame(self.cuerpo, height=8, bg=T("bg_content")).pack(fill="x")

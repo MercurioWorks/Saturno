@@ -115,7 +115,8 @@ def segmento_de(reserva, segmentos):
 def asignar(con, evento_id, respetar_fijadas=True):
     """Reasigna todo el evento. Devuelve un resumen con lo que no ha cabido."""
     salones = {f["id"]: f for f in con.execute(
-        "SELECT * FROM salon WHERE evento_id = ? ORDER BY orden", (evento_id,))}
+        "SELECT * FROM salon WHERE evento_id = ? AND gestionado = 1"
+        " ORDER BY orden", (evento_id,))}
     mesas_por_salon = defaultdict(list)
     mesas = {}
     for f in con.execute(

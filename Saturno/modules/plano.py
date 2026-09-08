@@ -129,8 +129,8 @@ class VistaPlano:
 
     def al_mostrar(self):
         self.salones = list(self.con.execute(
-            "SELECT * FROM salon WHERE evento_id = ? ORDER BY orden",
-            (self.evento_id,)))
+            "SELECT * FROM salon WHERE evento_id = ? AND gestionado = 1"
+            " ORDER BY orden", (self.evento_id,)))
         if self.salon_activo is None and self.salones:
             self.salon_activo = (self.salones[0]["id"], "")
         self._pintar_cinta()

@@ -49,6 +49,21 @@
           "grandes": 1
         }
       ]
+    },
+    {
+      "nombre": "GREGAL",
+      "orden": 9,
+      "capacidad_base": 8,
+      "capacidad_max": 12,
+      "mesas_ampliables": 0,
+      "precio_menu": 0.0,
+      "zonas": [
+        {
+          "nombre": "",
+          "mesas": 14,
+          "grandes": 0
+        }
+      ]
     }
   ],
   "segmentos": [
@@ -72,8 +87,8 @@
     {
       "nombre": "IMSERSO",
       "orden": 2,
-      "excluir": true,
-      "salon": "",
+      "excluir": false,
+      "salon": "GREGAL",
       "zona": "",
       "codigos": [
         "95"

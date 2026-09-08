@@ -214,8 +214,8 @@ class SaturnoApp(ctk.CTk):
             hijo.destroy()
         self._botones.clear()
         self._construir_sidebar()
-        activo, self.modulo_activo = self.modulo_activo, None
-        self.mostrar(activo or "reparto")
+        self.modulo_activo = None
+        self.mostrar("reparto")
 
     def _cambiar_tema(self):
         theme_toggle()

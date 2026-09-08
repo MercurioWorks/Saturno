@@ -127,11 +127,12 @@ class VistaEventos:
 
         botones = tk.Frame(caja, bg=fondo)
         botones.pack(fill="x", padx=16, pady=(0, 12))
-        if not activo:
-            ctk.CTkButton(botones, text="Trabajar en este", width=140,
-                          height=28, corner_radius=6,
-                          command=lambda i=e["id"]: self._abrir(i)).pack(
-                              side="left")
+        # Entrar lleva al reparto, que es por donde se empieza a trabajar.
+        ctk.CTkButton(botones,
+                      text="Entrar" if activo else "Entrar en este evento",
+                      width=170, height=30, corner_radius=6,
+                      command=lambda i=e["id"]: self._abrir(i)).pack(
+                          side="left")
         ctk.CTkButton(botones, text="Renombrar", width=110, height=28,
                       corner_radius=6, fg_color="transparent", border_width=1,
                       border_color=T("border_card"),
@@ -146,7 +147,10 @@ class VistaEventos:
     # ── Acciones ──────────────────────────────────────────────────
 
     def _abrir(self, evento_id):
-        self.app.cambiar_evento(evento_id)
+        """Entra en el evento y deja al usuario en el reparto."""
+        if evento_id != self.evento_id:
+            self.app.cambiar_evento(evento_id)
+        self.app.mostrar("reparto")
 
     def _nuevo(self):
         VentanaNuevoEvento(self.frame, self.con, self.evento_id,

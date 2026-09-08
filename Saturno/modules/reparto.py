@@ -200,7 +200,8 @@ class VistaReparto:
         segmentos, destinos, excluidos = motor.cargar_reglas(self.con,
                                                              self.evento_id)
         salones = list(self.con.execute(
-            "SELECT * FROM salon WHERE evento_id = ? ORDER BY orden",
+            "SELECT * FROM salon WHERE evento_id = ? AND gestionado = 1"
+            " ORDER BY orden",
             (self.evento_id,)))
         nombres = {s["id"]: s["nombre"] for s in salones}
 

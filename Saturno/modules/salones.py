@@ -82,7 +82,8 @@ class VistaSalones:
 
     def al_mostrar(self):
         self.salones = list(self.con.execute(
-            "SELECT * FROM salon WHERE evento_id = ? ORDER BY orden",
+            "SELECT * FROM salon WHERE evento_id = ? AND gestionado = 1"
+            " ORDER BY orden",
             (self.evento_id,)))
         # Cada zona se coloca por separado: la Naya esta en otra planta que
         # el resto del Palacio, asi que tiene su propio plano.

@@ -38,6 +38,10 @@ CREATE TABLE IF NOT EXISTS salon (
     precio_menu    REAL NOT NULL DEFAULT 0,
     -- Imagen del plano del salon, para colocar las mesas encima.
     plano_imagen   TEXT NOT NULL DEFAULT '',
+    -- A 0 el salon existe pero no se reparte aqui: no sale como destino ni
+    -- se sientan mesas en el, pero SI cuenta en el resumen y en el total de
+    -- plazas del hotel. Es el caso de un salon que lleva otra persona.
+    gestionado     INTEGER NOT NULL DEFAULT 1,
     -- Cuantas mesas del salon se pueden montar con sillas de mas. Es un
     -- limite fisico: en la gala de 2025 fueron 2 en Palacio y 1 en Bordon.
     -- A 0, el salon no estira nada y lo que no cabe se reporta.
@@ -159,6 +163,7 @@ MIGRACIONES = [
     ("reserva", "salon_id", "INTEGER"),
     ("reserva", "zona_destino", "TEXT NOT NULL DEFAULT ''"),
     ("reserva", "apartada", "INTEGER NOT NULL DEFAULT 0"),
+    ("salon", "gestionado", "INTEGER NOT NULL DEFAULT 1"),
 ]
 
 

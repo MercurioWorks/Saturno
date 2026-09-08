@@ -93,7 +93,6 @@ class VistaResumen:
             self._linea("TOTAL PAX", ad + ni, True)
 
         self._total_hotel(filas, otros)
-        self._aparte()
 
     def _filas(self, gestionados=True):
         """Una fila por zona de salon, con las cuentas de la hoja."""
@@ -228,52 +227,22 @@ class VistaResumen:
         self._linea("TOTAL PLAZAS DISPONIBLES", plazas - ad - ni, True,
                     ORO if plazas - ad - ni else None)
         tk.Frame(self.cuerpo, height=8, bg=T("bg_content")).pack(fill="x")
-        self._linea("TOTAL ADULTOS Y NIÑOS", "%d  +  %d" % (ad, ni))
-        self._linea("TOTAL PAX", ad + ni, True)
+        self._linea("SENTADOS: ADULTOS Y NIÑOS", "%d  +  %d" % (ad, ni))
+        self._linea("TOTAL PAX SENTADOS", ad + ni, True)
 
-    def _aparte(self):
-        """Lo que no se sienta aqui, contado por separado como en la hoja."""
-        segmentos, destinos, excluidos = motor.cargar_reglas(self.con,
-                                                             self.evento_id)
-        if not excluidos:
-            return
-        nombres = {f["id"]: f["nombre"] for f in self.con.execute(
-            "SELECT id, nombre FROM segmento WHERE evento_id = ?",
-            (self.evento_id,))}
-        por_segmento = {}
-        for r in self.con.execute(
-            "SELECT * FROM reserva WHERE evento_id = ?", (self.evento_id,)
-        ):
-            seg = motor.segmento_de(r, segmentos)
-            if seg in excluidos:
-                d = por_segmento.setdefault(seg, [0, 0])
-                d[0] += r["adultos"]
-                d[1] += r["ninos"]
-        if not por_segmento:
-            return
-
-        tk.Frame(self.cuerpo, height=22, bg=T("bg_content")).pack(fill="x")
-        tk.Label(self.cuerpo, text="FUERA DE ESTOS SALONES",
-                 bg=T("bg_content"), fg=T("text_primary"),
-                 font=("Segoe UI", 12, "bold"), anchor="w").pack(fill="x")
-        tk.Label(self.cuerpo,
-                 text="segmentos que no se sientan aqui y se llevan aparte",
-                 bg=T("bg_content"), fg=T("text_dim"),
-                 font=("Segoe UI", 9), anchor="w").pack(fill="x", pady=(0, 6))
-        total = 0
-        for seg, (ad, ni) in por_segmento.items():
-            self._linea(nombres.get(seg, "?"),
-                        "%d AD  +  %d N  =  %d" % (ad, ni, ad + ni))
-            total += ad + ni
-
-        tk.Frame(self.cuerpo, height=16, bg=T("bg_content")).pack(fill="x")
-        tk.Label(self.cuerpo, text="TOTAL GENERAL", bg=T("bg_content"),
-                 fg=T("text_primary"), font=("Segoe UI", 12, "bold"),
-                 anchor="w").pack(fill="x", pady=(0, 6))
+        # Y el cuadre con el evento entero: si falta gente por repartir, hay
+        # que verlo aqui, que si no las cuentas no salen y parece que se han
+        # perdido comensales por el camino.
         f = self.con.execute(
             "SELECT COALESCE(SUM(adultos), 0) ad, COALESCE(SUM(ninos), 0) ni"
             " FROM reserva WHERE evento_id = ?", (self.evento_id,)).fetchone()
-        self._linea("TOTAL ADULTOS Y NIÑOS", "%d  +  %d" % (f["ad"], f["ni"]))
+        pendientes = (f["ad"] + f["ni"]) - (ad + ni)
+        if pendientes:
+            tk.Frame(self.cuerpo, height=8, bg=T("bg_content")).pack(fill="x")
+            self._linea("TODAVIA SIN REPARTIR", pendientes, True, ROJO)
+        tk.Frame(self.cuerpo, height=8, bg=T("bg_content")).pack(fill="x")
+        self._linea("TOTAL ADULTOS Y NIÑOS DEL EVENTO",
+                    "%d  +  %d" % (f["ad"], f["ni"]))
         self._linea("TOTAL PAX DEL EVENTO", f["ad"] + f["ni"], True)
 
     def _exportar(self):

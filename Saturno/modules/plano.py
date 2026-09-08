@@ -71,6 +71,10 @@ class VistaPlano:
             width=180, height=30)
         self.selector.set("Fichas")
         self.selector.pack(side="left", padx=10)
+        ctk.CTkLabel(cab, text="arrastra para cambiar de mesa · doble clic"
+                              " para fijar · boton derecho para quitar",
+                     font=ctk.CTkFont(family="Segoe UI", size=10),
+                     text_color=T("text_dim")).pack(side="left", padx=10)
 
         for texto, orden in (("Exportar a Excel", self._exportar),
                              ("Asignar mesas", self._asignar),
@@ -101,6 +105,8 @@ class VistaPlano:
         self.lienzo.bind("<B1-Motion>", self._arrastrar)
         self.lienzo.bind("<ButtonRelease-1>", self._soltar)
         self.lienzo.bind("<Double-Button-1>", self._doble_clic)
+        # Boton derecho sobre alguien sentado: levantarlo de la mesa.
+        self.lienzo.bind("<Button-3>", self._boton_derecho)
         self.lienzo.bind("<MouseWheel>", self._rueda)
         self.lienzo.bind("<Configure>", self._al_redimensionar)
         self._ancho_pintado = 0
@@ -507,6 +513,33 @@ class VistaPlano:
                 self.con.execute(
                     "UPDATE asignacion SET mesa_id = ?, fijada = 1"
                     " WHERE id = ?", (mesa_id, arrastre["id"]))
+        self.al_mostrar()
+
+    def _boton_derecho(self, evento):
+        """Saca a una reserva de la mesa y la devuelve a Reparto."""
+        asignacion_id = self._etiqueta_bajo(self.lienzo, evento, "res:")
+        if asignacion_id is None:
+            return
+        f = self.con.execute(
+            "SELECT a.pax, r.id, r.cliente, r.num_reserva FROM asignacion a"
+            " JOIN reserva r ON r.id = a.reserva_id WHERE a.id = ?",
+            (asignacion_id,)).fetchone()
+        if f is None:
+            return
+        if not messagebox.askyesno(
+            "Quitar de la mesa",
+            "%s (%s), %d comensales.\n\nSe levanta de la mesa y vuelve a"
+            " POR REPARTIR, para decidir de nuevo a que salon va."
+            "\n\n¿Seguimos?" % (f["cliente"], f["num_reserva"] or "externa",
+                                f["pax"]), parent=self.frame):
+            return
+        with self.con:
+            # Queda apartada para que ninguna regla la devuelva a su salon.
+            self.con.execute(
+                "UPDATE reserva SET salon_id = NULL, zona_destino = '',"
+                " apartada = 1 WHERE id = ?", (f["id"],))
+            self.con.execute("DELETE FROM asignacion WHERE reserva_id = ?",
+                             (f["id"],))
         self.al_mostrar()
 
     def _doble_clic(self, evento):

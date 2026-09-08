@@ -215,6 +215,8 @@ class VistaReparto:
             if r["salon_id"]:
                 por_sitio.setdefault(
                     (r["salon_id"], r["zona_destino"] or ""), []).append(r)
+            elif r["apartada"]:
+                pendientes.append(r)
             elif seg is not None and destinos.get(seg):
                 salon_id, zona = destinos[seg][0]
                 por_sitio.setdefault((salon_id, zona), []).append(r)
@@ -589,9 +591,13 @@ class VistaReparto:
 
         salon_id, zona = columna["clave"] if columna["clave"] else (None, "")
         with self.con:
+            # Al devolver a POR REPARTIR queda apartada, para que la regla
+            # que la mando a su salon no la recupere en el acto.
+            apartada = 1 if salon_id is None else 0
             self.con.executemany(
-                "UPDATE reserva SET salon_id = ?, zona_destino = ?"
-                " WHERE id = ?", [(salon_id, zona, r) for r in ids])
+                "UPDATE reserva SET salon_id = ?, zona_destino = ?,"
+                " apartada = ? WHERE id = ?",
+                [(salon_id, zona, apartada, r) for r in ids])
             # Cambiar de salon deja sin efecto la mesa que tuvieran: se les
             # da otra al pulsar «Asignar mesas».
             self.con.executemany(

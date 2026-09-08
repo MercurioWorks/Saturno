@@ -16,15 +16,17 @@ _log = logging.getLogger(__name__)
 # Un color por modulo, igual que en Mercurio: el color significa lo mismo en
 # la barra lateral y dentro de la pantalla.
 MODULOS = [
+    ("eventos",  "Eventos",        "#7fd18a"),
     ("reparto",  "Reparto",        "#c07ad4"),
     ("plano",    "Plano de mesas", "#C9A84C"),
     ("reservas", "Reservas",       "#4A9EEF"),
+    ("resumen",  "Resumen",        "#5B9CF6"),
     ("salones",  "Salones",        "#25A873"),
     ("config",   "Configuracion",  "#e0a458"),
 ]
 
-ICONOS = {"reparto": "⇄", "plano": "▦", "reservas": "≡", "salones": "◎",
-          "config": "⚙"}
+ICONOS = {"eventos": "◆", "reparto": "⇄", "plano": "▦", "reservas": "≡",
+          "resumen": "∑", "salones": "◎", "config": "⚙"}
 
 
 def _apagar(color, fuerza=0.45):
@@ -78,8 +80,15 @@ class SaturnoApp(ctk.CTk):
                      font=ctk.CTkFont(family="Segoe UI", size=22,
                                       weight="bold"),
                      text_color=T("text_primary")).pack(anchor="w")
-        ctk.CTkLabel(cabecera, text="Asignacion de mesas",
-                     font=ctk.CTkFont(family="Segoe UI", size=11),
+        evento = self.con.execute("SELECT * FROM evento WHERE id = ?",
+                                  (self.evento_id,)).fetchone()
+        self.etiqueta_evento = ctk.CTkLabel(
+            cabecera, text=evento["nombre"] if evento else "sin evento",
+            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+            text_color="#C9A84C", anchor="w")
+        self.etiqueta_evento.pack(anchor="w", fill="x")
+        ctk.CTkLabel(cabecera, text=(evento["fecha"] or "") if evento else "",
+                     font=ctk.CTkFont(family="Segoe UI", size=10),
                      text_color=T("text_dim")).pack(anchor="w")
 
         ctk.CTkFrame(self.sidebar, height=1, fg_color=T("border")).pack(fill="x")
@@ -171,6 +180,12 @@ class SaturnoApp(ctk.CTk):
         self._pintar_botones()
 
     def _crear_vista(self, codigo):
+        if codigo == "eventos":
+            from modules.eventos import VistaEventos
+            return VistaEventos(self.contenido, self.con, self.evento_id, self)
+        if codigo == "resumen":
+            from modules.resumen import VistaResumen
+            return VistaResumen(self.contenido, self.con, self.evento_id, self)
         if codigo == "reparto":
             from modules.reparto import VistaReparto
             return VistaReparto(self.contenido, self.con, self.evento_id, self)
@@ -185,6 +200,22 @@ class SaturnoApp(ctk.CTk):
             return VistaSalones(self.contenido, self.con, self.evento_id, self)
         from modules.configuracion import VistaConfiguracion
         return VistaConfiguracion(self.contenido, self.con, self.evento_id, self)
+
+    def cambiar_evento(self, evento_id):
+        """Pasa a trabajar en otro evento: se rehace todo con sus datos."""
+        self.evento_id = evento_id
+        evento = self.con.execute("SELECT * FROM evento WHERE id = ?",
+                                  (evento_id,)).fetchone()
+        self.title("Saturno - %s" % (evento["nombre"] if evento else ""))
+        for vista in self._instancias.values():
+            vista.frame.destroy()
+        self._instancias.clear()
+        for hijo in self.sidebar.winfo_children():
+            hijo.destroy()
+        self._botones.clear()
+        self._construir_sidebar()
+        activo, self.modulo_activo = self.modulo_activo, None
+        self.mostrar(activo or "reparto")
 
     def _cambiar_tema(self):
         theme_toggle()

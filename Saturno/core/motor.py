@@ -179,6 +179,8 @@ def asignar(con, evento_id, respetar_fijadas=True):
         """
         if reserva["salon_id"] and reserva["salon_id"] in salones:
             return [(reserva["salon_id"], reserva["zona_destino"] or "")]
+        if reserva["apartada"]:
+            return []      # apartada a mano: espera en Reparto
         seg = segmento_de(reserva, segmentos)
         if seg is None:
             return []

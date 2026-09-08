@@ -113,7 +113,11 @@ CREATE TABLE IF NOT EXISTS reserva (
     -- Salon que le has dado tu en la pantalla de Reparto. Manda sobre
     -- cualquier regla: las reglas solo deciden lo que no has decidido.
     salon_id     INTEGER REFERENCES salon(id) ON DELETE SET NULL,
-    zona_destino TEXT NOT NULL DEFAULT ''
+    zona_destino TEXT NOT NULL DEFAULT '',
+    -- Apartada a mano: se ha sacado de su salon y espera en Reparto. Sin
+    -- esto, una reserva que llego por una regla volvia a su salon en
+    -- cuanto se devolvia, y no habia forma de sacarla de ahi.
+    apartada     INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS asignacion (
@@ -154,6 +158,7 @@ MIGRACIONES = [
     ("salon", "plano_imagen", "TEXT NOT NULL DEFAULT ''"),
     ("reserva", "salon_id", "INTEGER"),
     ("reserva", "zona_destino", "TEXT NOT NULL DEFAULT ''"),
+    ("reserva", "apartada", "INTEGER NOT NULL DEFAULT 0"),
 ]
 
 
